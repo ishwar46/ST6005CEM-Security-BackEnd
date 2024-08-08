@@ -1,95 +1,129 @@
 const mongoose = require("mongoose");
+const bcrypt = require("bcrypt");
 const Schema = mongoose.Schema;
 
 const userSchema = new Schema({
-    personalInformation: {
-        title: { type: String },
-        fullName: {
-            firstName: { type: String },
-            middleName: { type: String },
-            lastName: { type: String },
-        },
-        nationality: { type: String },
-        nameOfInstitution: { type: String },
-        jobPosition: { type: String },
-        officeAddress: { type: String },
-        emailAddress: { type: String },
-        phoneNumber: { type: String },
-        mobileNumber: { type: String },
-        userPassword: { type: String },
-        uploadPaymentReceipt: { type: String },
+  personalInformation: {
+    title: { type: String },
+    fullName: {
+      firstName: { type: String },
+      middleName: { type: String },
+      lastName: { type: String },
     },
-    accommodation: {
-        checkInDate: { type: Date },
-        checkOutDate: { type: Date },
-    },
-    dietaryRequirements: {
+    nationality: { type: String },
+    nameOfInstitution: { type: String },
+    jobPosition: { type: String },
+    officeAddress: { type: String },
+    emailAddress: { type: String },
+    phoneNumber: { type: String },
+    mobileNumber: { type: String },
+    userPassword: { type: String },
+    uploadPaymentReceipt: { type: String },
+  },
+  accommodation: {
+    checkInDate: { type: Date },
+    checkOutDate: { type: Date },
+  },
+  dietaryRequirements: {
+    vegetarian: { type: Boolean, default: false },
+    halal: { type: Boolean, default: false },
+    nonveg: { type: Boolean, default: false },
+    other: { type: String },
+  },
+  mobileSimCardRequirements: {
+    takeSim: { type: Boolean, default: false },
+    simType: { type: String },
+  },
+  profilePicture: {
+    uploadDate: { type: Date, default: Date.now },
+    fileName: { type: String },
+  },
+  chiefDelegateOrSpeaker: {
+    chiefDelegate: { type: Boolean, default: false },
+    participant: { type: Boolean, default: false },
+  },
+  biography: { type: String },
+  accompanyingPerson: {
+    hasAccompanyingPerson: { type: Boolean, default: false },
+    accompanyingPersonInformation: {
+      title: { type: String },
+      fullName: {
+        firstName: { type: String },
+        middleName: { type: String },
+        lastName: { type: String },
+      },
+      relationship: { type: String },
+      dietaryRequirements: {
         vegetarian: { type: Boolean, default: false },
         halal: { type: Boolean, default: false },
         nonveg: { type: Boolean, default: false },
         other: { type: String },
+      },
+      pictureUrl: { type: String },
     },
-    mobileSimCardRequirements: {
-        takeSim: { type: Boolean, default: false },
-        simType: { type: String },
+    pictureuploadreadAccompany: { type: Boolean, default: false },
+  },
+  adminVerification: {
+    status: {
+      type: String,
+      enum: ["pending", "accepted", "rejected"],
+      default: "pending",
     },
-    profilePicture: {
-        uploadDate: { type: Date, default: Date.now },
-        fileName: { type: String },
+    adminEmail: { type: String },
+    adminRemarks: { type: String },
+    verifiedDate: { type: Date },
+    verificationRequestDate: { type: Date, default: Date.now },
+  },
+  termsandcond: { type: Boolean, default: false },
+  biographyguidelinesread: { type: Boolean, default: false },
+  privacypolicyready: { type: Boolean, default: false },
+  pictureuploadread: { type: Boolean, default: false },
+  isVerifiedByAdmin: { type: Boolean, default: false },
+  email: { type: String },
+  password: { type: String },
+  isAdmin: { type: Boolean, default: false },
+  failedAttempts: { type: Number, default: 0 },
+  lockUntil: { type: Date },
+  attendance: [
+    {
+      date: { type: Date, default: Date.now },
+      status: { type: Boolean },
     },
-    chiefDelegateOrSpeaker: {
-        chiefDelegate: { type: Boolean, default: false },
-        participant: { type: Boolean, default: false },
+  ],
+  qrCode: { type: String },
+  sessionsAttended: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Session",
     },
-    biography: { type: String },
-    accompanyingPerson: {
-        hasAccompanyingPerson: { type: Boolean, default: false },
-        accompanyingPersonInformation: {
-            title: { type: String },
-            fullName: {
-                firstName: { type: String },
-                middleName: { type: String },
-                lastName: { type: String },
-            },
-            relationship: { type: String },
-            dietaryRequirements: {
-                vegetarian: { type: Boolean, default: false },
-                halal: { type: Boolean, default: false },
-                nonveg: { type: Boolean, default: false },
-                other: { type: String },
-            },
-            pictureUrl: { type: String },
-        },
-        pictureuploadreadAccompany: { type: Boolean, default: false },
+  ],
+  passwordHistory: [
+    {
+      password: String,
+      changedAt: Date,
     },
-    adminVerification: {
-        status: {
-            type: String,
-            enum: ["pending", "accepted", "rejected"],
-            default: "pending",
-        },
-        adminEmail: { type: String },
-        adminRemarks: { type: String },
-        verifiedDate: { type: Date },
-        verificationRequestDate: { type: Date, default: Date.now },
-    },
-    termsandcond: { type: Boolean, default: false },
-    biographyguidelinesread: { type: Boolean, default: false },
-    privacypolicyready: { type: Boolean, default: false },
-    pictureuploadread: { type: Boolean, default: false },
-    isVerifiedByAdmin: { type: Boolean, default: false },
-    email: { type: String },
-    password: { type: String },
-    isAdmin: { type: Boolean, default: false },
-    attendance: [{
-        date: { type: Date, default: Date.now },
-        status: { type: Boolean },
-    }, ],
-    qrCode: { type: String },
-    sessionsAttended: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Session",
-    }, ],
+  ],
+  passwordExpiry: { type: Date, default: Date.now },
+});
+
+// Middleware to hash the password before saving
+userSchema.pre("save", async function (next) {
+  if (this.isModified("password")) {
+    const hash = await bcrypt.hash(this.password, 10);
+    this.password = hash;
+
+    // Add to password history
+    this.passwordHistory.push({ password: hash, changedAt: new Date() });
+
+    // Limit password history to last 5 passwords
+    if (this.passwordHistory.length > 5) {
+      this.passwordHistory.shift();
+    }
+
+    // Set password expiry (e.g., 90 days)
+    this.passwordExpiry = Date.now() + 90 * 24 * 60 * 60 * 1000; // 90 days from now
+  }
+  next();
 });
 
 const User = mongoose.model("User", userSchema);
