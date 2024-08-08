@@ -58,7 +58,6 @@ app.use(
     express.static(path.join(__dirname, "public/uploads/bannerimages"))
 );
 
-app.use("/api/subscription", require("./routes/subscriptionRoutes"));
 app.use("/api/gallery", require("./routes/galleryRoutes"));
 app.use("/api/speaker", require("./routes/speakerRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
