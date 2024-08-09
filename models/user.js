@@ -83,6 +83,7 @@ const userSchema = new Schema({
   password: { type: String },
   isAdmin: { type: Boolean, default: false },
   failedAttempts: { type: Number, default: 0 },
+  lastLogin: { type: Date },
   lockUntil: { type: Date },
   attendance: [
     {
@@ -104,26 +105,6 @@ const userSchema = new Schema({
     },
   ],
   passwordExpiry: { type: Date, default: Date.now },
-});
-
-// Middleware to hash the password before saving
-userSchema.pre("save", async function (next) {
-  if (this.isModified("password")) {
-    const hash = await bcrypt.hash(this.password, 10);
-    this.password = hash;
-
-    // Add to password history
-    this.passwordHistory.push({ password: hash, changedAt: new Date() });
-
-    // Limit password history to last 5 passwords
-    if (this.passwordHistory.length > 5) {
-      this.passwordHistory.shift();
-    }
-
-    // Set password expiry (e.g., 90 days)
-    this.passwordExpiry = Date.now() + 90 * 24 * 60 * 60 * 1000; // 90 days from now
-  }
-  next();
 });
 
 const User = mongoose.model("User", userSchema);

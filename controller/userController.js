@@ -78,14 +78,14 @@ const userRegister = async (req, res) => {
       const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
       // Check if the email already exists in the database
-      // const existingUser = await User.findOne({
-      //   "personalInformation.emailAddress": emailAddress,
-      // });
-      // if (existingUser) {
-      //   return res
-      //     .status(400)
-      //     .json({ success: false, message: "Email address already exists." });
-      // }
+      const existingUser = await User.findOne({
+        "personalInformation.emailAddress": emailAddress,
+      });
+      if (existingUser) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Email address already exists." });
+      }
 
       //Determine the instituion
       const institutionName =
@@ -181,35 +181,31 @@ const login = async (req, res) => {
   const { firstName, password } = req.body;
 
   try {
-    // Ensure firstName and password are provided
     if (!firstName || !password) {
       return res.status(400).json({
-        error: "Both username and password are required.",
+        error: "Both first name and password are required.",
       });
     }
 
-    // Find users with the provided first name
     const users = await User.find({
       "personalInformation.fullName.firstName": firstName,
     });
 
-    // Log for debugging
-    console.log(users);
-
     if (users.length === 0) {
       return res.status(401).json({
-        error:
-          "Invalid credentials or user not found. Please check your username and try again.",
+        error: "Invalid credentials.",
       });
     }
 
-    // Find the correct user by comparing passwords
     let user = null;
+
+    // Loop through users to find the one with the matching password
     for (let i = 0; i < users.length; i++) {
       const isPasswordMatch = await bcrypt.compare(
         password,
         users[i].personalInformation.userPassword
       );
+
       if (isPasswordMatch) {
         user = users[i];
         break;
@@ -217,17 +213,64 @@ const login = async (req, res) => {
     }
 
     if (!user) {
-      return res.status(401).json({ error: "Wrong credentials." });
+      // If no password matched, increment failedAttempts for all users with the same first name
+      for (let i = 0; i < users.length; i++) {
+        users[i].failedAttempts = (users[i].failedAttempts || 0) + 1;
+
+        if (users[i].failedAttempts >= 5) {
+          users[i].lockUntil = Date.now() + 30 * 60 * 1000; // Lock for 30 minutes
+          await users[i].save();
+          return res.status(403).json({
+            error: "Account is locked. Please try again later.",
+            lockDuration: 1800, // 30 minutes
+          });
+        }
+
+        await users[i].save();
+      }
+
+      const remainingAttempts = 5 - users[0].failedAttempts;
+      return res.status(403).json({
+        error: "Invalid credentials.",
+        remainingAttempts,
+      });
     }
 
-    // Generate JWT token for authentication
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+      const lockDuration = Math.ceil((user.lockUntil - Date.now()) / 1000);
+      return res.status(403).json({
+        error: "Account is locked. Please try again later.",
+        lockDuration,
+      });
+    }
+
+    // If the password is correct, reset failed attempts and lockUntil
+    user.failedAttempts = 0;
+    user.lockUntil = undefined;
+    user.lastLogin = new Date();
+    await user.save();
+
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
       expiresIn: "6h",
     });
 
-    res.status(200).json({ success: true, token, user });
+    res.status(200).json({
+      success: true,
+      message: "Login successful.",
+      token,
+      user: {
+        id: user._id,
+        personalInformation: user.personalInformation,
+        lastLogin: user.lastLogin,
+        dietaryRequirements: user.dietaryRequirements,
+        accompanyingPerson: user.accompanyingPerson,
+        profilePicture: user.profilePicture,
+        adminVerification: user.adminVerification,
+        isVerifiedByAdmin: user.isVerifiedByAdmin,
+      },
+    });
   } catch (error) {
-    console.log(error);
+    console.error("Login error:", error);
     res.status(500).json({ error: "Internal server error." });
   }
 };
@@ -265,18 +308,18 @@ const getAllUsers = async (req, res) => {
 };
 
 // Controller to get a user by ID
-const getUsersById = async(req, res) => {
-    try {
-        const { id } = req.params;
-        const user = await User.findById(id).select("-password -__v");
-        if (!user) {
-            return res.status(404).json({ error: "User not found." });
-        }
-        res.status(200).json(user);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Internal server error." });
+const getUsersById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id).select("-password -__v");
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
     }
+    res.status(200).json(user);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal server error." });
+  }
 };
 const getUserById = async (req, res) => {
   try {
@@ -503,5 +546,5 @@ module.exports = {
   changePassword,
   markAttendance,
   generateQRCode,
-  getUsersById
+  getUsersById,
 };

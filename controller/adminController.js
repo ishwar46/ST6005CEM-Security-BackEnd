@@ -16,45 +16,36 @@ function generateRandomPassword(length = 6) {
   return password;
 }
 
-/// Admin registration controller
 const adminRegister = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // Check if admin with this email already exists
     const existingAdmin = await User.findOne({
       email: email,
       isAdmin: true,
     }).select("-password -__v");
+
     if (existingAdmin) {
       return res
         .status(400)
         .json({ error: "Admin with this email already exists." });
     }
 
-    // Validate password complexity
-    const passwordValidationErrors = passwordSchema.validate(password, {
-      list: true,
-    });
-    if (passwordValidationErrors.length > 0) {
-      return res.status(400).json({
-        error: "Password does not meet complexity requirements.",
-        details: passwordValidationErrors,
-      });
-    }
+    console.log("Original password:", password);
+    const hashedPassword = await bcrypt.hash(password, 10);
+    console.log("Hashed password:", hashedPassword);
 
-    // Create a new admin
     const admin = new User({
       email: email,
-      password: await bcrypt.hash(password, 10), // Hash the password
-      isAdmin: true, // Set isAdmin to true for admin user
+      password: hashedPassword, // Store the hashed password directly
+      isAdmin: true,
     });
 
     await admin.save();
     res.status(201).json({ message: "Admin registered successfully." });
   } catch (error) {
-    console.error("Admin registration error:", error); // Log the error details
-    res.status(500).json({ error: error.message }); // Return the exact error message
+    console.error("Admin registration error:", error);
+    res.status(500).json({ error: error.message });
   }
 };
 
@@ -62,23 +53,24 @@ const adminLogin = async (req, res) => {
   const { email, password } = req.body;
 
   try {
+    console.log("Login attempt for email:", email);
     const admin = await User.findOne({ email: email, isAdmin: true });
+
     if (!admin) {
+      // console.log("No admin found with this email");
       return res.status(403).json({ error: "Invalid credentials." });
     }
 
-    // Check if account is locked
-    if (admin.lockUntil && admin.lockUntil > Date.now()) {
-      const lockDuration = Math.ceil((admin.lockUntil - Date.now()) / 1000);
-      return res.status(403).json({
-        error: "Account is locked. Please try again later.",
-        lockDuration,
-      });
-    }
+    // console.log("Admin found, checking password...");
+    // console.log("Stored hashed password:", admin.password);
 
     const isMatch = await bcrypt.compare(password, admin.password);
+    console.log("Password match result:", isMatch);
+
     if (!isMatch) {
+      console.log("Password does not match");
       admin.failedAttempts = (admin.failedAttempts || 0) + 1;
+
       if (admin.failedAttempts >= 5) {
         admin.lockUntil = Date.now() + 30 * 60 * 1000; // 30 minutes lock
         await admin.save();
@@ -88,6 +80,7 @@ const adminLogin = async (req, res) => {
           lockDuration,
         });
       }
+
       await admin.save();
       return res.status(403).json({
         error: "Invalid credentials.",
@@ -95,6 +88,10 @@ const adminLogin = async (req, res) => {
       });
     }
 
+    console.log("Password matches, proceeding with login...");
+
+    // Update the lastLogin field
+    admin.lastLogin = new Date();
     admin.failedAttempts = 0;
     admin.lockUntil = undefined;
     await admin.save();
@@ -113,9 +110,11 @@ const adminLogin = async (req, res) => {
         id: admin._id,
         email: admin.email,
         isAdmin: admin.isAdmin,
+        lastLogin: admin.lastLogin,
       },
     });
   } catch (error) {
+    console.error("Login error:", error);
     res.status(500).json({ error: "Internal server error." });
   }
 };
