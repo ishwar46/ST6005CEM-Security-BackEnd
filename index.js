@@ -12,9 +12,9 @@ const app = express();
 // configuring dotenv to use the .env file
 dotenv.config();
 const corsOptions = {
-    origin: true,
-    credentials: true,
-    optionSuccessStatus: 200,
+  origin: true,
+  credentials: true,
+  optionSuccessStatus: 200,
 };
 app.use(cors(corsOptions));
 
@@ -27,35 +27,41 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const directories = [
-    "public/uploads",
-    "public/uploads/userimage",
-    "public/uploads/accompanyingimages",
-    "public/uploads/bannerimages",
+  "public/uploads",
+  "public/uploads/userimage",
+  "public/uploads/accompanyingimages",
+  "public/uploads/bannerimages",
 ];
 
 directories.forEach((dir) => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
+
+// Middleware to log the route and method
+app.use((req, res, next) => {
+  console.log(`Route: ${req.originalUrl}, Method: ${req.method}`);
+  next();
 });
 
 // Defining routes
 app.use("/public", express.static(path.join(__dirname, "public")));
 app.use(
-    "/public/uploads",
-    express.static(path.join(__dirname, "public/uploads"))
+  "/public/uploads",
+  express.static(path.join(__dirname, "public/uploads"))
 );
 app.use(
-    "/public/uploads/userimage",
-    express.static(path.join(__dirname, "public/uploads/userimage"))
+  "/public/uploads/userimage",
+  express.static(path.join(__dirname, "public/uploads/userimage"))
 );
 app.use(
-    "/public/uploads/accompanyingimages",
-    express.static(path.join(__dirname, "public/uploads/accompanyingimages"))
+  "/public/uploads/accompanyingimages",
+  express.static(path.join(__dirname, "public/uploads/accompanyingimages"))
 );
 app.use(
-    "/public/uploads/bannerimages",
-    express.static(path.join(__dirname, "public/uploads/bannerimages"))
+  "/public/uploads/bannerimages",
+  express.static(path.join(__dirname, "public/uploads/bannerimages"))
 );
 
 app.use("/api/gallery", require("./routes/galleryRoutes"));
@@ -65,12 +71,12 @@ app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/season", require("./routes/seasonRoutes"));
 
 app.get("/", (req, res) => {
-    res.status(200).send("Hello world!");
+  res.status(200).send("Hello world!");
 });
 
 // Defining port
 const PORT = process.env.PORT || 5000;
 // running the server on port 5000
 app.listen(PORT, () => {
-    console.log(`Listening on port: ${PORT}`);
+  console.log(`Listening on port: ${PORT}`);
 });
