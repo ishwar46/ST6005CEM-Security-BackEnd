@@ -3,6 +3,7 @@ const bcrypt = require("bcrypt");
 const upload = require("../middleware/multipledocs");
 const jwt = require("jsonwebtoken");
 const QRCode = require("qrcode");
+const LoginActivity = require("../models/loginaActivity");
 
 const userRegister = async (req, res) => {
   try {
@@ -192,6 +193,15 @@ const login = async (req, res) => {
     });
 
     if (users.length === 0) {
+      // Log the failed login attempt
+      await LoginActivity.create({
+        email: firstName,
+        role: "user",
+        success: false,
+        message: "Invalid credentials.",
+        endpoint: req.originalUrl,
+        requestDetails: JSON.stringify(req.body),
+      });
       return res.status(401).json({
         error: "Invalid credentials.",
       });
@@ -220,6 +230,14 @@ const login = async (req, res) => {
         if (users[i].failedAttempts >= 5) {
           users[i].lockUntil = Date.now() + 30 * 60 * 1000; // Lock for 30 minutes
           await users[i].save();
+          await LoginActivity.create({
+            email: firstName,
+            role: "user",
+            success: false,
+            message: "Account is locked due to too many failed attempts.",
+            endpoint: req.originalUrl,
+            requestDetails: JSON.stringify(req.body),
+          });
           return res.status(403).json({
             error: "Account is locked. Please try again later.",
             lockDuration: 1800, // 30 minutes
@@ -230,6 +248,15 @@ const login = async (req, res) => {
       }
 
       const remainingAttempts = 5 - users[0].failedAttempts;
+      await LoginActivity.create({
+        email: firstName,
+        role: "user",
+        success: false,
+        message: "Invalid credentials.",
+        remainingAttempts,
+        endpoint: req.originalUrl,
+        requestDetails: JSON.stringify(req.body),
+      });
       return res.status(403).json({
         error: "Invalid credentials.",
         remainingAttempts,
@@ -252,6 +279,17 @@ const login = async (req, res) => {
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
       expiresIn: "6h",
+    });
+
+    await LoginActivity.create({
+      email: firstName,
+      role: "user",
+      success: true,
+      message: "Login successful.",
+      method: req.method, // Log the HTTP method
+      endpoint: req.originalUrl, // Log the endpoint route
+      requestDetails: JSON.stringify(req.body),
+      lastLogin: user.lastLogin, // Log the last login time
     });
 
     res.status(200).json({

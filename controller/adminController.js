@@ -5,6 +5,7 @@ const { sendEmail } = require("../middleware/sendEmail");
 const fs = require("fs");
 const handlebars = require("handlebars");
 const passwordSchema = require("../helpers/passwordValidation");
+const LoginActivity = require("../models/loginaActivity");
 
 function generateRandomPassword(length = 6) {
   const charset =
@@ -53,16 +54,30 @@ const adminLogin = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    console.log("Login attempt for email:", email);
     const admin = await User.findOne({ email: email, isAdmin: true });
 
     if (!admin) {
+      await LoginActivity.create({
+        email,
+        role: "admin",
+        success: false,
+        message: "Invalid credentials.",
+        endpoint: req.originalUrl,
+        requestDetails: JSON.stringify(req.body),
+      });
       return res.status(403).json({ error: "Invalid credentials." });
     }
 
-    // Check if the account is locked
     if (admin.lockUntil && admin.lockUntil > Date.now()) {
       const lockDuration = Math.ceil((admin.lockUntil - Date.now()) / 1000);
+      await LoginActivity.create({
+        email,
+        role: "admin",
+        success: false,
+        message: `Account is locked. Please try again later. Lock duration: ${lockDuration} seconds`,
+        endpoint: req.originalUrl,
+        requestDetails: JSON.stringify(req.body),
+      });
       return res.status(403).json({
         error: "Account is locked. Please try again later.",
         lockDuration,
@@ -78,6 +93,14 @@ const adminLogin = async (req, res) => {
         admin.lockUntil = Date.now() + 30 * 60 * 1000; // 30 minutes lock
         await admin.save();
         const lockDuration = Math.ceil((admin.lockUntil - Date.now()) / 1000);
+        await LoginActivity.create({
+          email,
+          role: "admin",
+          success: false,
+          message: "Account is locked due to too many failed attempts.",
+          endpoint: req.originalUrl,
+          requestDetails: JSON.stringify(req.body),
+        });
         return res.status(403).json({
           error: "Account is locked. Please try again later.",
           lockDuration,
@@ -85,13 +108,21 @@ const adminLogin = async (req, res) => {
       }
 
       await admin.save();
+      await LoginActivity.create({
+        email,
+        role: "admin",
+        success: false,
+        message: "Invalid credentials.",
+        remainingAttempts: 5 - admin.failedAttempts,
+        endpoint: req.originalUrl,
+        requestDetails: JSON.stringify(req.body),
+      });
       return res.status(403).json({
         error: "Invalid credentials.",
         remainingAttempts: 5 - admin.failedAttempts,
       });
     }
 
-    // If the password matches, reset failed attempts and lock status
     admin.failedAttempts = 0;
     admin.lockUntil = undefined;
     admin.lastLogin = new Date();
@@ -102,6 +133,17 @@ const adminLogin = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
+
+    await LoginActivity.create({
+      email,
+      role: "admin",
+      success: true,
+      message: "Admin login successful.",
+      method: req.method, // Log the HTTP method
+      endpoint: req.originalUrl, // Log the endpoint route
+      requestDetails: JSON.stringify(req.body),
+      lastLogin: admin.lastLogin, // Log the last login time
+    });
 
     res.status(200).json({
       success: true,
@@ -120,6 +162,38 @@ const adminLogin = async (req, res) => {
   }
 };
 
+//Login Activites
+
+const getLoginActivities = async (req, res) => {
+  try {
+    const activities = await LoginActivity.find().sort({ timestamp: -1 });
+    res.status(200).json({ success: true, activities });
+  } catch (error) {
+    console.error("Error fetching login activities:", error);
+    res.status(500).json({ error: "Internal server error." });
+  }
+};
+
+//Delete Login Activities
+
+const deleteLoginActivity = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const activity = await LoginActivity.findByIdAndDelete(id);
+
+    if (!activity) {
+      return res.status(404).json({ error: "Login activity not found." });
+    }
+
+    res
+      .status(200)
+      .json({ success: true, message: "Login activity deleted successfully." });
+  } catch (error) {
+    console.error("Error deleting login activity:", error);
+    res.status(500).json({ error: "Internal server error." });
+  }
+};
 const adminVerifyUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -260,4 +334,6 @@ module.exports = {
   adminVerifyUser,
   deleteUser,
   adminEditUser,
+  getLoginActivities,
+  deleteLoginActivity,
 };
