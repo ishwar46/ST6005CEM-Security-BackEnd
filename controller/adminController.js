@@ -57,18 +57,21 @@ const adminLogin = async (req, res) => {
     const admin = await User.findOne({ email: email, isAdmin: true });
 
     if (!admin) {
-      // console.log("No admin found with this email");
       return res.status(403).json({ error: "Invalid credentials." });
     }
 
-    // console.log("Admin found, checking password...");
-    // console.log("Stored hashed password:", admin.password);
+    // Check if the account is locked
+    if (admin.lockUntil && admin.lockUntil > Date.now()) {
+      const lockDuration = Math.ceil((admin.lockUntil - Date.now()) / 1000);
+      return res.status(403).json({
+        error: "Account is locked. Please try again later.",
+        lockDuration,
+      });
+    }
 
     const isMatch = await bcrypt.compare(password, admin.password);
-    console.log("Password match result:", isMatch);
 
     if (!isMatch) {
-      console.log("Password does not match");
       admin.failedAttempts = (admin.failedAttempts || 0) + 1;
 
       if (admin.failedAttempts >= 5) {
@@ -88,12 +91,10 @@ const adminLogin = async (req, res) => {
       });
     }
 
-    console.log("Password matches, proceeding with login...");
-
-    // Update the lastLogin field
-    admin.lastLogin = new Date();
+    // If the password matches, reset failed attempts and lock status
     admin.failedAttempts = 0;
     admin.lockUntil = undefined;
+    admin.lastLogin = new Date();
     await admin.save();
 
     const token = jwt.sign(
