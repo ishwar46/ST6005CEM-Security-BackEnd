@@ -257,8 +257,7 @@ const adminVerifyUser = async (req, res) => {
 
       // Send email to the user with the random password and invoice details
       await sendEmail({
-        subject:
-          "Registration Approved - 36th ACSIC Conference Kathmandu, Nepal",
+        subject: "Registration Approved - ASIAN Conference",
         html: htmlToSend,
         to: user.personalInformation.emailAddress,
       });
@@ -317,15 +316,6 @@ const deleteUser = async (req, res) => {
     console.log(error);
     res.status(500).json({ error: "Internal server error." });
   }
-};
-
-const generateInvoiceNumber = () => {
-  return (
-    "ACSICNEP-" +
-    Math.floor(Math.random() * 1000000)
-      .toString()
-      .padStart(6, "0")
-  );
 };
 
 module.exports = {
