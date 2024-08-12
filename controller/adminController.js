@@ -7,13 +7,37 @@ const handlebars = require("handlebars");
 const passwordSchema = require("../helpers/passwordValidation");
 const LoginActivity = require("../models/loginaActivity");
 
-function generateRandomPassword(length = 6) {
-  const charset =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+function generateRandomPassword() {
+  const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lowercase = "abcdefghijklmnopqrstuvwxyz";
+  const digits = "0123456789";
+  const symbols = "!@#$%^&*()-_=+[]{}|;:',.<>?/";
+  const allChars = uppercase + lowercase + digits + symbols;
+
   let password = "";
-  for (let i = 0; i < length; i++) {
-    password += charset.charAt(Math.floor(Math.random() * charset.length));
+
+  // Ensure the password meets the criteria
+  password += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
+  password += lowercase.charAt(Math.floor(Math.random() * lowercase.length));
+  password += digits.charAt(Math.floor(Math.random() * digits.length));
+  password += symbols.charAt(Math.floor(Math.random() * symbols.length));
+
+  // Generate the remaining characters randomly
+  for (let i = 4; i < 12; i++) {
+    password += allChars.charAt(Math.floor(Math.random() * allChars.length));
   }
+
+  // Shuffle the characters in the password to avoid any predictable patterns
+  password = password
+    .split("")
+    .sort(() => Math.random() - 0.5)
+    .join("");
+
+  // Validate against the schema
+  while (!passwordSchema.validate(password)) {
+    password = generateRandomPassword(); // Regenerate if it doesn't meet the schema
+  }
+
   return password;
 }
 
@@ -329,6 +353,13 @@ const deleteUser = async (req, res) => {
     res.status(500).json({ error: "Internal server error." });
   }
 };
+
+function generateInvoiceNumber() {
+  // Generate a unique invoice number, e.g., using the current timestamp and a random number
+  const timestamp = Date.now();
+  const randomNum = Math.floor(Math.random() * 1000);
+  return `INV-${timestamp}-${randomNum}`;
+}
 
 module.exports = {
   adminRegister,

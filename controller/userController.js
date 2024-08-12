@@ -416,7 +416,6 @@ const changePassword = async (req, res) => {
         message: "Invalid Email",
       });
     }
-    //change password
 
     // Iterate through each user and check passwords
     let passwordChanged = false;
@@ -433,6 +432,21 @@ const changePassword = async (req, res) => {
         );
 
         if (isMatched) {
+          // Check if the new password has been used before
+          const passwordUsedBefore = await Promise.all(
+            user.passwordHistory.map(async (entry) =>
+              bcrypt.compare(newPassword, entry.password)
+            )
+          );
+
+          if (passwordUsedBefore.some((result) => result)) {
+            return res.status(400).json({
+              success: false,
+              message:
+                "This password has been used before. Please choose a different password.",
+            });
+          }
+
           // Validate new password length
           if (newPassword.length < 6 || confirmPassword.length < 6) {
             return res.status(400).json({
@@ -451,6 +465,12 @@ const changePassword = async (req, res) => {
 
           // Hash the new password
           const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+          // Add the current password to password history
+          user.passwordHistory.push({
+            password: user.personalInformation.userPassword,
+            changedAt: new Date(),
+          });
 
           // Update user's password
           user.personalInformation.userPassword = hashedPassword;
