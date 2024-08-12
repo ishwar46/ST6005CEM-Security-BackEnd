@@ -1,4 +1,4 @@
-const seasonController = require("../controller/seasonController");
+const seasonController = require("../controller/sessionController");
 const authMiddleware = require("../middleware/routesAuth");
 const express = require("express");
 const router = express.Router();
@@ -21,17 +21,18 @@ router.put(
 );
 
 // Add attendance for a session
-router.post(
-  "/markUserAttendance",
-  seasonController.markUserAttendance
-);
+router.post("/markUserAttendance", seasonController.markUserAttendance);
 router.post(
   "/markSpeakerAttendance",
 
   seasonController.markSpeakerAttendance
 );
-router.get("/getAllAttendance/:sessionId",authMiddleware, seasonController.getAllAttendance);
+router.get(
+  "/getAllAttendance/:sessionId",
+  authMiddleware,
+  seasonController.getAllAttendance
+);
 router.post("/addComment", seasonController.addComment);
-router.get("/getAllComments/:sessionId",  seasonController.getAllComments);
+router.get("/getAllComments/:sessionId", seasonController.getAllComments);
 
 module.exports = router;
