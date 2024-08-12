@@ -6,8 +6,8 @@ const loginActivitySchema = new mongoose.Schema({
   success: { type: Boolean, required: true },
   message: { type: String },
   remainingAttempts: { type: Number },
-  endpoint: { type: String }, // Endpoint accessed during the request
-  requestDetails: { type: String }, // JSON stringified request details
+  endpoint: { type: String },
+  requestDetails: { type: String },
   timestamp: { type: Date, default: Date.now },
 });
 

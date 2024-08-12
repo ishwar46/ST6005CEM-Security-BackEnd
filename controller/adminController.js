@@ -21,6 +21,18 @@ const adminRegister = async (req, res) => {
   const { email, password } = req.body;
 
   try {
+    // Validate the password against the schema
+    const passwordValidationErrors = passwordSchema.validate(password, {
+      list: true,
+    });
+
+    if (passwordValidationErrors.length > 0) {
+      return res.status(400).json({
+        error: "Password does not meet the requirements.",
+        details: passwordValidationErrors,
+      });
+    }
+
     const existingAdmin = await User.findOne({
       email: email,
       isAdmin: true,
