@@ -8,13 +8,13 @@ const {
   getLoginActivities,
   deleteLoginActivity,
 } = require("../controller/adminController");
+const authAdmin = require("../middleware/adminAuth");
 
-router.post("/register", adminRegister);
+router.post("/register", authAdmin, adminRegister);
 router.post("/login", adminLogin);
 router.put("/verify/:userId", adminVerifyUser);
-router.delete("/delete/:userId", deleteUser);
-router.put("/edit/:userId", adminEditUser);
-router.get("/login-activities", getLoginActivities);
-router.delete("/login-activities/:id", deleteLoginActivity);
-
+router.delete("/delete/:userId", authAdmin, deleteUser);
+router.put("/edit/:userId", authAdmin, adminEditUser);
+router.get("/login-activities", authAdmin, getLoginActivities);
+router.delete("/login-activities/:id", authAdmin, deleteLoginActivity);
 module.exports = router;
